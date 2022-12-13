@@ -1,0 +1,4 @@
+1. [pan] It somehow mimic quantum phenomena i.e if absorption is enough then only it will be absorbed by fluorofore otherwise it will be absorbed by chromophore.
+   [Jacques] It is more representive of classical phenomena, once all excitation weight is absorbed then power of fluoroscence is decided by that weight in that bin.
+2. [pan] Here number of photon to be launched is not fixed, It varies between Nphoton<=photon launched<=2*Nphoton.
+   [Jacques] Here number of photon is fixed.
