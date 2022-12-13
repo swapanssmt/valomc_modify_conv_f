@@ -1,7 +1,7 @@
 
 #include <string>
 #define _USE_MATH_DEFINES
-#define VALOMC_MEX
+#define VALOMC_MEX_EX
 #include <cmath>
 #include <limits>
 #include <inttypes.h>
