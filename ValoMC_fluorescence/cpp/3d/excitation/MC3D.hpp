@@ -2093,15 +2093,15 @@ void MC3D::PropagatePhoton(Photon *phot)
 
       // Upgrade photon weigh
       phot->weight *= exp(-mua_ex_sol[phot->curel] * ds);
-      // checking for fluoroscence
-      double P_f=(1-exp(-ds*mua_ex_f[phot->curel]));
-      if(UnifOpen()<P_f && Qyield_f>0)
-      {
-        N_F_Photons++;
-        CreatePhoton_f(phot);
-        PropagatePhoton_f(phot);
-        return;
-      }
+      //// checking for fluoroscence
+      //double P_f=(1-exp(-ds*mua_ex_f[phot->curel]));
+      //if(UnifOpen()<P_f && Qyield_f>0)
+      //{
+      //  N_F_Photons++;
+      //  CreatePhoton_f(phot);
+      //  PropagatePhoton_f(phot);
+      //  return;
+      //}
 
       // Photon has reached a situation where it has to be scattered
       prop -= ds;

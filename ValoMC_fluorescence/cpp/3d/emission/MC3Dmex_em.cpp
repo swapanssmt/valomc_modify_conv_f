@@ -1,7 +1,7 @@
 
 #include <string>
 #define _USE_MATH_DEFINES
-#define VALOMC_MEX
+#define VALOMC_MEX_EM
 #include <cmath>
 #include <limits>
 #include <inttypes.h>
@@ -20,7 +20,7 @@
 //   mex MC3Dmex.cpp
 //
 // To compile with OpenMP (multithread) support (from MATLAB prompt):
-//   mex -DUSE_OMP cpp/3d/MC3Dmex.cpp CFLAGS="$CFLAGS -fopenmp" LDFLAGS="$LDFLAGS -fopenmp"
+//   mex -DUSE_OMP cpp/3d/emission/MC3Dmex_em.cpp CFLAGS="$CFLAGS -fopenmp" LDFLAGS="$LDFLAGS -fopenmp"
 // Do not use OpenMP version if the MATLAB does not support the compiler used
 
 time_t starting_time;
