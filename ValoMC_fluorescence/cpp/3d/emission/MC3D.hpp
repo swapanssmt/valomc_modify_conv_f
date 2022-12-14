@@ -91,7 +91,7 @@ public:
 
   // Create, scatter, mirror & propagate a photon
   void CreatePhoton(Photon *phot);
-  void CreatePhoton_f(Photon *phot);
+  void CreatePhoton_f(Photon *phot, int_fast64_t el);
   void ScatterPhoton(Photon *phot);
   void ScatterPhoton_f(Photon *phot);
   void MirrorPhoton(Photon *phot, int_fast64_t ib);
@@ -1570,8 +1570,9 @@ void MC3D::CreatePhoton(Photon *phot)
 //********************************************************************************************************
 //***************************** modify fluorescence********************************************************
 // Create a new photon based on LightSources, LightSourcesMother and LighSourcesCDF
-void MC3D::CreatePhoton_f(Photon *phot)
+void MC3D::CreatePhoton_f(Photon *phot, int_fast64_t el)
 {
+  phot->curel=el;
   phot->curface = -1;
   // draw a random point inside tetrahedron
   double arr[4];
@@ -1593,10 +1594,12 @@ void MC3D::CreatePhoton_f(Photon *phot)
 
   phot->nextel = -1;
   phot->nextface = -1;
-  double ck1=omega*Tau_f*UnifOpen();
-  double ck2= sqrt(1+pow(ck1,2));
-  phot->weight =phot->weight*Qyield_f/ck2;
-  phot->phase = phot->phase-atan(-ck1);
+  //double ck1=omega*Tau_f*UnifOpen();
+  //double ck2= sqrt(1+pow(ck1,2));
+  //phot->weight =phot->weight*Qyield_f/ck2;
+  //phot->phase = phot->phase-atan(-ck1);
+  phot->weight = 1.0;
+  phot->phase = phase0;
 }
 //************************************************************************************************************
 //*************************************************************************************************************
@@ -2094,14 +2097,14 @@ void MC3D::PropagatePhoton(Photon *phot)
       // Upgrade photon weigh
       phot->weight *= exp(-mua_ex_sol[phot->curel] * ds);
       // checking for fluoroscence
-      double P_f=(1-exp(-ds*mua_ex_f[phot->curel]));
-      if(UnifOpen()<P_f && Qyield_f>0)
-      {
-        N_F_Photons++;
-        CreatePhoton_f(phot);
-        PropagatePhoton_f(phot);
-        return;
-      }
+      //double P_f=(1-exp(-ds*mua_ex_f[phot->curel]));
+      //if(UnifOpen()<P_f && Qyield_f>0)
+      //{
+      //  N_F_Photons++;
+      //  CreatePhoton_f(phot);
+      //  PropagatePhoton_f(phot);
+      //  return;
+      //}
 
       // Photon has reached a situation where it has to be scattered
       prop -= ds;
@@ -2218,18 +2221,20 @@ void MC3D::MonteCarlo(bool (*progress)(double), void (*finalchecks)(int,int))
   for (ii = 0; ii < nthread; ii++)
   {
     MCS[ii] = *this;
-    MCS[ii].Nphoton = Nphoton / nthread;
+    //MCS[ii].Nphoton = Nphoton / nthread;
+    MCS[ii].Nphoton = H.Nx / nthread;
     MCS[ii].seed = (unsigned long) (MCS[ii].seed * totalthreads + ii);
     MCS[ii].InitRand();
     ticks[ii] = 0;
   }
+  long fracElements = H.Nx / nthread;
 
   // [AL] if remainder of nphoton / nthread is non-zero, total photon count is not the same as Nphoton
   // therefore add the remaining photons to the last thread.
   long realnphot = 0;
   for (ii = 0; ii < nthread; ii++)
     realnphot += MCS[ii].Nphoton;
-  MCS[nthread - 1].Nphoton += Nphoton - realnphot;
+  MCS[nthread - 1].Nphoton += H.Nx - realnphot;
   // Compute Monte Carlo on each thread separetely
 #pragma omp parallel
   {
@@ -2249,7 +2254,7 @@ void MC3D::MonteCarlo(bool (*progress)(double), void (*finalchecks)(int,int))
             {
               csum += ticks[jj];
             }
-            if (!progress(100 * ((double)csum / (double)Nphoton)))
+            if (!progress(100 * ((double)csum / (double)H.Nx)))
             {
               abort_computation = true;
             }
@@ -2258,29 +2263,37 @@ void MC3D::MonteCarlo(bool (*progress)(double), void (*finalchecks)(int,int))
         if (abort_computation)
           break;
       }
-      MCS[thread].CreatePhoton(&phot);
-      MCS[thread].PropagatePhoton(&phot);
+      int_fast64_t iphoton1;
+      int_fast64_t element_no;
+      element_no=thread*fracElements+iphoton-1;
+      for (iphoton1 = 1; iphoton1 <= Nphoton; iphoton1++)
+      {
+        MCS[thread].CreatePhoton_f(&phot,element_no);
+        MCS[thread].PropagatePhoton_f(&phot);
+
+      }
+      
     }
   }
-#ifdef VALOMC_MEX
+#ifdef VALOMC_MEX_EM
   int_fast64_t csum = 0;
   for (jj = 0; jj < nthread; jj++)
   {
     csum += ticks[jj];
   }
 
-  finalchecks(csum, Nphoton);
+  finalchecks(csum, H.Nx);
 
 #endif
 #pragma omp barrier
 
   // Sum up the results to first instance and delete MCS
-  Nphoton = 0;
+  //Nphoton = 0;
   loss = 0;
   N_F_Photons=0;
   for (jj = 0; jj < nthread; jj++)
   {
-    Nphoton += MCS[jj].Nphoton;
+    //Nphoton += MCS[jj].Nphoton;
     loss += MCS[jj].loss;
     N_F_Photons += MCS[jj].N_F_Photons;
   }
@@ -2417,20 +2430,24 @@ void MC3D::MonteCarlo(bool (*progress)(double), void (*finalchecks)(int,int))
   // Single thread implementation
   //long ii;
 
-  long itick = max(1, Nphoton / 100);
+  long itick = max(1, H.Nx / 100);
   int percentage = 0;
   long iphoton;
+  long iphoton1;
   Photon phot;
-  for (iphoton = 0; iphoton < Nphoton; iphoton++)
+  for (iphoton1 = 0; iphoton1 < H.Nx; iphoton1++)
   {
-    if ((iphoton % itick == 0))
+    if ((iphoton1 % itick == 0))
     {
-      percentage = ((double)100.0 * iphoton / (double)Nphoton);
+      percentage = ((double)100.0 * iphoton1 / (double)H.Nx);
       if (!progress(percentage))
         break;
     }
-    CreatePhoton(&phot);
-    PropagatePhoton(&phot);
+    for (iphoton = 0; iphoton < Nphoton; iphoton++)
+    {
+      CreatePhoton_f(&phot,iphoton1);
+      PropagatePhoton_f(&phot);
+    }
   }
 
 #endif

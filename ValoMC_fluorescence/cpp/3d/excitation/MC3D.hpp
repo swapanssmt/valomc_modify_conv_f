@@ -2262,7 +2262,7 @@ void MC3D::MonteCarlo(bool (*progress)(double), void (*finalchecks)(int,int))
       MCS[thread].PropagatePhoton(&phot);
     }
   }
-#ifdef VALOMC_MEX
+#ifdef VALOMC_MEX_EX
   int_fast64_t csum = 0;
   for (jj = 0; jj < nthread; jj++)
   {

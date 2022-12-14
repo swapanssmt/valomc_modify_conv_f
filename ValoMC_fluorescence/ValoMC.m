@@ -1,4 +1,4 @@
-function solution = ValoMC(vmcmesh, vmcmedium, vmcboundary, vmcoptions)
+function [solution_ex,solution_em] = ValoMC(vmcmesh, vmcmedium, vmcboundary, vmcoptions)
 % Runs a photon transport simulation
 %
 % USAGE:
@@ -170,7 +170,8 @@ function solution = ValoMC(vmcmesh, vmcmedium, vmcboundary, vmcoptions)
 
     % set default options
     f = double(0.0);
-    Nphoton = int64(1e6);
+    Nphoton_ex = int64(1e6);
+    Nphoton_em = int64(1e3);
     Qyield_f=double(1.0);
     Tau_f=double(10e-9);
     phase0 = 0;
@@ -184,10 +185,13 @@ function solution = ValoMC(vmcmesh, vmcmedium, vmcboundary, vmcoptions)
         if(isfield(vmcoptions, 'frequency'))
             f = double(vmcoptions.frequency);
         end
-        if(isfield(vmcoptions,'photon_count'))
-            Nphoton = int64(vmcoptions.photon_count);
+        if(isfield(vmcoptions,'photon_count_ex'))
+            Nphoton_ex = int64(vmcoptions.photon_count_ex);
         end
         %%%%%%%%%%%% modified %%%%%%%%%%%%%%%%%%
+        if(isfield(vmcoptions,'photon_count_em'))
+            Nphoton_em = int64(vmcoptions.photon_count_em);
+        end
         if(isfield(vmcoptions,'Qyield_f'))
             Qyield_f = double(vmcoptions.Qyield_f);
         end
@@ -233,8 +237,8 @@ function solution = ValoMC(vmcmesh, vmcmedium, vmcboundary, vmcoptions)
 
         if(isfield(vmcoptions,'export_filename'))
             fp = fopen(vmcoptions.export_filename, 'w');
-            fprintf(fp, '%d %d %d %d\n', size(H, 1), size(BH, 1), size(r, ...
-                                                              1), Nphoton);
+            fprintf(fp, '%d %d %d %d %d\n', size(H, 1), size(BH, 1), size(r, ...
+                                                              1), Nphoton_ex,Nphoton_em);
             fprintf(fp, '%e %e %e %e %d %d %d\n', f, phase0, Qyield_f, Tau_f, rnseed(1), rnseed(2),NBin2Dtheta);
 
             % write the array dimensions to the file so that import
@@ -296,12 +300,12 @@ function solution = ValoMC(vmcmesh, vmcmedium, vmcboundary, vmcoptions)
            GaussianSigma = [];
         end
         % Solve
-        [solution.element_fluence, solution.boundary_exitance, solution.boundary_fluence, solution.element_radiance, solution.R_boundary_exitance, solution.boundary_radiance, solution.F_element_fluence, solution.F_boundary_exitance, solution.F_boundary_fluence, solution.F_element_radiance, solution.F_R_boundary_exitance, solution.F_boundary_radiance, solution.simulation_time, solution.seed_used] = MC2Dmex(H, HN, BH, r, BCType, BCIntensity, BCLightDirectionType, BCLightDirection, BCn, mua_ex_sol, mua_ex_f, mua_em_sol, mus_ex, mus_em, g, n, f, phase0, Nphoton, Qyield_f, Tau_f, NBin2Dtheta, GaussianSigma, disable_pbar, uint64(rnseed));
+        [solution_ex.element_fluence, solution_ex.boundary_exitance, solution_ex.boundary_fluence, solution_ex.element_radiance, solution_ex.R_boundary_exitance, solution_ex.boundary_radiance, solution_ex.F_element_fluence, solution_ex.F_boundary_exitance, solution_ex.F_boundary_fluence, solution_ex.F_element_radiance, solution_ex.F_R_boundary_exitance, solution_ex.F_boundary_radiance, solution_ex.simulation_time, solution_ex.seed_used] = MC2Dmex(H, HN, BH, r, BCType, BCIntensity, BCLightDirectionType, BCLightDirection, BCn, mua_ex_sol, mua_ex_f, mua_em_sol, mus_ex, mus_em, g, n, f, phase0, Nphoton_ex, Qyield_f, Tau_f, NBin2Dtheta, GaussianSigma, disable_pbar, uint64(rnseed));
             if(isfield(vmcmedium,'nx') && isfield(vmcmedium,'ny'))
                 % Two dimensional input
-                first = reshape(solution.element_fluence(1:length(vmcmesh.H)/2),vmcmedium.nx, vmcmedium.ny);
-                second = reshape(solution.element_fluence(length(vmcmesh.H)/2+1:length(vmcmesh.H)),vmcmedium.nx, vmcmedium.ny);
-                solution.grid_fluence = (first+second)*0.5;
+                first = reshape(solution_ex.element_fluence(1:length(vmcmesh.H)/2),vmcmedium.nx, vmcmedium.ny);
+                second = reshape(solution_ex.element_fluence(length(vmcmesh.H)/2+1:length(vmcmesh.H)),vmcmedium.nx, vmcmedium.ny);
+                solution_ex.grid_fluence = (first+second)*0.5;
             end
         end
       else if(dimensionality == 3)
@@ -327,7 +331,7 @@ function solution = ValoMC(vmcmesh, vmcmedium, vmcboundary, vmcoptions)
         if(isfield(vmcoptions,'export_filename'))        
             
             fp = fopen(vmcoptions.export_filename, 'w');
-            fprintf(fp, '%d %d %d %d\n', size(H, 1), size(BH, 1), size(r, 1), Nphoton);    
+            fprintf(fp, '%d %d %d %d %d\n', size(H, 1), size(BH, 1), size(r, 1), Nphoton_ex,Nphoton_em);    
             fprintf(fp, '%18.10f %18.10f %18.10f %18.10f %d %d\n', f, phase0, Qyield_f, Tau_f, rnseed(1), rnseed(2));
 
             if(isfield(vmcmedium,'nx') && isfield(vmcmedium,'ny') && ...
@@ -369,37 +373,52 @@ function solution = ValoMC(vmcmesh, vmcmedium, vmcboundary, vmcoptions)
             fclose(fp);
             return
         else
-            [solution.element_fluence, solution.boundary_exitance, solution.boundary_fluence, solution.element_radiance, solution.R_boundary_exitance, solution.boundary_radiance, solution.F_element_fluence, solution.F_boundary_exitance, solution.F_boundary_fluence, solution.F_element_radiance, solution.F_R_boundary_exitance, solution.F_boundary_radiance, solution.simulation_time, solution.seed_used] = MC3Dmex(H, HN, BH, r, BCType, BCIntensity, BCLightDirectionType, BCLightDirection, BCn, mua_ex_sol, mua_ex_f, mua_em_sol, mus_ex, mus_em, g, n, f, phase0, Nphoton, Qyield_f, Tau_f, ang_discr_centroid, disable_pbar, uint64(rnseed));
+            [solution_ex.element_fluence, solution_ex.boundary_exitance, solution_ex.boundary_fluence, solution_ex.element_radiance, solution_ex.R_boundary_exitance, solution_ex.boundary_radiance, solution_ex.F_element_fluence, solution_ex.F_boundary_exitance, solution_ex.F_boundary_fluence, solution_ex.F_element_radiance, solution_ex.F_R_boundary_exitance, solution_ex.F_boundary_radiance, solution_ex.simulation_time, solution_ex.seed_used] = MC3Dmex_ex(H, HN, BH, r, BCType, BCIntensity, BCLightDirectionType, BCLightDirection, BCn, mua_ex_sol, mua_ex_f, mua_em_sol, mus_ex, mus_em, g, n, f, phase0, Nphoton_ex, Qyield_f, Tau_f, ang_discr_centroid, disable_pbar, uint64(rnseed));
+            [solution_em.element_fluence, solution_em.boundary_exitance, solution_em.boundary_fluence, solution_em.element_radiance, solution_em.R_boundary_exitance, solution_em.boundary_radiance, solution_em.F_element_fluence, solution_em.F_boundary_exitance, solution_em.F_boundary_fluence, solution_em.F_element_radiance, solution_em.F_R_boundary_exitance, solution_em.F_boundary_radiance, solution_em.simulation_time, solution_em.seed_used] = MC3Dmex_em(H, HN, BH, r, BCType, BCIntensity, BCLightDirectionType, BCLightDirection, BCn, mua_ex_sol, mua_ex_f, mua_em_sol, mus_ex, mus_em, g, n, f, phase0, Nphoton_em, Qyield_f, Tau_f, ang_discr_centroid, disable_pbar, uint64(rnseed));
         end
         if(isfield(vmcmedium,'nx') && isfield(vmcmedium,'ny') && isfield(vmcmedium,'nz'))
             % Three dimensional input
             nvoxels= length(vmcmesh.H) / 6;
-            first = reshape(solution.element_fluence(1:nvoxels), vmcmedium.nx, vmcmedium.ny, vmcmedium.nz);
-            second = reshape(solution.element_fluence(nvoxels+1:2*nvoxels),vmcmedium.nx, vmcmedium.ny, vmcmedium.nz);
-            third = reshape(solution.element_fluence(nvoxels*2+1:3*nvoxels),vmcmedium.nx, vmcmedium.ny, vmcmedium.nz);
-            fourth = reshape(solution.element_fluence(nvoxels*3+1:4*nvoxels),vmcmedium.nx, vmcmedium.ny, vmcmedium.nz);
-            fifth = reshape(solution.element_fluence(nvoxels*4+1:5*nvoxels),vmcmedium.nx, vmcmedium.ny, vmcmedium.nz);
-            sixth = reshape(solution.element_fluence(nvoxels*5+1:6*nvoxels),vmcmedium.nx, vmcmedium.ny, vmcmedium.nz);
+            first = reshape(solution_ex.element_fluence(1:nvoxels), vmcmedium.nx, vmcmedium.ny, vmcmedium.nz);
+            second = reshape(solution_ex.element_fluence(nvoxels+1:2*nvoxels),vmcmedium.nx, vmcmedium.ny, vmcmedium.nz);
+            third = reshape(solution_ex.element_fluence(nvoxels*2+1:3*nvoxels),vmcmedium.nx, vmcmedium.ny, vmcmedium.nz);
+            fourth = reshape(solution_ex.element_fluence(nvoxels*3+1:4*nvoxels),vmcmedium.nx, vmcmedium.ny, vmcmedium.nz);
+            fifth = reshape(solution_ex.element_fluence(nvoxels*4+1:5*nvoxels),vmcmedium.nx, vmcmedium.ny, vmcmedium.nz);
+            sixth = reshape(solution_ex.element_fluence(nvoxels*5+1:6*nvoxels),vmcmedium.nx, vmcmedium.ny, vmcmedium.nz);
 
-            solution.grid_fluence = (first+second+third+fourth+fifth+sixth)/6;
+            solution_ex.grid_fluence = (first+second+third+fourth+fifth+sixth)/6;
         end
       end
     end
 
     % Remove an imaginary solution that is zero
     if(f == 0)
-        solution.element_fluence = real(solution.element_fluence);
-        solution.boundary_fluence = real(solution.boundary_fluence);
-        solution.boundary_exitance = real(solution.boundary_exitance);
-        solution.element_radiance = real(solution.element_radiance);
-        solution.boundary_radiance = real(solution.boundary_radiance);
-        solution.R_boundary_exitance = real(solution.R_boundary_exitance);
-        solution.F_element_fluence = real(solution.F_element_fluence);
-        solution.F_boundary_fluence = real(solution.F_boundary_fluence);
-        solution.F_boundary_exitance = real(solution.F_boundary_exitance);
-        solution.F_element_radiance = real(solution.F_element_radiance);
-        solution.F_boundary_radiance = real(solution.F_boundary_radiance);
-        solution.F_R_boundary_exitance = real(solution.F_R_boundary_exitance);
+        solution_ex.element_fluence = real(solution_ex.element_fluence);
+        solution_ex.boundary_fluence = real(solution_ex.boundary_fluence);
+        solution_ex.boundary_exitance = real(solution_ex.boundary_exitance);
+        solution_ex.element_radiance = real(solution_ex.element_radiance);
+        solution_ex.boundary_radiance = real(solution_ex.boundary_radiance);
+        solution_ex.R_boundary_exitance = real(solution_ex.R_boundary_exitance);
+        solution_ex.F_element_fluence = real(solution_ex.F_element_fluence);
+        solution_ex.F_boundary_fluence = real(solution_ex.F_boundary_fluence);
+        solution_ex.F_boundary_exitance = real(solution_ex.F_boundary_exitance);
+        solution_ex.F_element_radiance = real(solution_ex.F_element_radiance);
+        solution_ex.F_boundary_radiance = real(solution_ex.F_boundary_radiance);
+        solution_ex.F_R_boundary_exitance = real(solution_ex.F_R_boundary_exitance);
+        %%%%%%%%%%%%%%%%%%%
+        solution_em.element_fluence = real(solution_em.element_fluence);
+        solution_em.boundary_fluence = real(solution_em.boundary_fluence);
+        solution_em.boundary_exitance = real(solution_em.boundary_exitance);
+        solution_em.element_radiance = real(solution_em.element_radiance);
+        solution_em.boundary_radiance = real(solution_em.boundary_radiance);
+        solution_em.R_boundary_exitance = real(solution_em.R_boundary_exitance);
+        solution_em.F_element_fluence = real(solution_em.F_element_fluence);
+        solution_em.F_boundary_fluence = real(solution_em.F_boundary_fluence);
+        solution_em.F_boundary_exitance = real(solution_em.F_boundary_exitance);
+        solution_em.F_element_radiance = real(solution_em.F_element_radiance);
+        solution_em.F_boundary_radiance = real(solution_em.F_boundary_radiance);
+        solution_em.F_R_boundary_exitance = real(solution_em.F_R_boundary_exitance);
+        %%%%%%%%%%%%%%%%%%%%%%
     end
 
 end
